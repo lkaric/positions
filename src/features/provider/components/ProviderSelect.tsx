@@ -22,7 +22,10 @@ const ProviderSelect: React.FC = () => {
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={ProviderEnum.METAMASK}>Metamask</SelectItem>
-        <SelectItem value={ProviderEnum.INFURA}>Infura</SelectItem>
+        {/* TODO: Disabled due to the rates, enable after completion */}
+        <SelectItem value={ProviderEnum.INFURA} disabled>
+          Infura
+        </SelectItem>
       </SelectContent>
     </Select>
   );

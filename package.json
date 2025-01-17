@@ -21,12 +21,14 @@
     "react-helmet-async": "^2.0.5",
     "react-router": "^7.1.2",
     "tailwind-merge": "^2.6.0",
+    "web3": "^4.16.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^19.6.0",
     "@eslint/js": "^9.17.0",
+    "@metamask/providers": "^18.3.1",
     "@types/node": "^22.10.7",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

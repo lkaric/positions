@@ -1,6 +1,10 @@
 import { Helmet } from 'react-helmet-async';
 
+import { useProvider } from '@/features/provider';
+
 const HomePage: React.FC = () => {
+  useProvider();
+
   return (
     <>
       <Helmet>
