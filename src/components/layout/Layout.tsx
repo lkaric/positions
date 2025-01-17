@@ -7,7 +7,7 @@ const Layout: React.FC = () => {
 
   return (
     <>
-      <header className="max-w-screen-xl w-full px-2 py-2 xl:mx-auto xl:py-4 flex justify-between items-center">
+      <header className="max-w-screen-xl w-full h-[72px] px-2 py-2 xl:mx-auto xl:py-4 flex justify-between items-center">
         <img src="/logo.svg" alt="Positions" />
         <ProviderSelect />
       </header>
