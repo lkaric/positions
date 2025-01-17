@@ -7,10 +7,16 @@ import {
 } from '@/components/ui';
 
 import { ProviderEnum } from '../constants';
+import { useProviderStore } from '../hooks';
 
 const ProviderSelect: React.FC = () => {
+  const { provider, setProvider } = useProviderStore();
+
   return (
-    <Select defaultValue={ProviderEnum.METAMASK}>
+    <Select
+      value={provider}
+      onValueChange={(value) => setProvider(value as ProviderEnum)}
+    >
       <SelectTrigger className="w-[180px]">
         <SelectValue placeholder="Provider" />
       </SelectTrigger>
