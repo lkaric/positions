@@ -1,16 +1,16 @@
 import { Helmet } from 'react-helmet-async';
 
-import { useProvider } from '@/features/provider';
+import { useWeb3Store } from '@/lib/web3';
 
 const HomePage: React.FC = () => {
-  useProvider();
-
+  const { error } = useWeb3Store();
   return (
     <>
       <Helmet>
         <title>Home - Positions</title>
       </Helmet>
       <h1>HomePage</h1>
+      <pre>{JSON.stringify(error?.message)}</pre>
       <p>
         Lorem, ipsum dolor sit amet consectetur adipisicing elit. Hic quae
         deserunt inventore veritatis sapiente vitae dolorum nesciunt quibusdam

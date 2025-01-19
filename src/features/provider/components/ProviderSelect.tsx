@@ -5,27 +5,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui';
-
-import { ProviderEnum } from '../constants';
-import { useProviderStore } from '../hooks';
+import { ProviderTypeEnum, useWeb3Store } from '@/lib/web3';
 
 const ProviderSelect: React.FC = () => {
-  const { provider, setProvider } = useProviderStore();
+  const { providerType, connect } = useWeb3Store();
 
   return (
     <Select
-      value={provider}
-      onValueChange={(value) => setProvider(value as ProviderEnum)}
+      value={providerType}
+      onValueChange={(value) => connect(value as ProviderTypeEnum)}
     >
       <SelectTrigger className="w-[180px]">
         <SelectValue placeholder="Provider" />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value={ProviderEnum.METAMASK}>Metamask</SelectItem>
-        {/* TODO: Disabled due to the rates, enable after completion */}
-        <SelectItem value={ProviderEnum.INFURA} disabled>
-          Infura
-        </SelectItem>
+        <SelectItem value={ProviderTypeEnum.METAMASK}>Metamask</SelectItem>
+        <SelectItem value={ProviderTypeEnum.INFURA}>Infura</SelectItem>
       </SelectContent>
     </Select>
   );

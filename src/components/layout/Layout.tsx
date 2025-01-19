@@ -1,9 +1,10 @@
 import { Outlet } from 'react-router';
 
-import { useProviderStore, ProviderSelect } from '@/features/provider';
+import { useWeb3Store } from '@/lib/web3';
+import { ProviderSelect } from '@/features/provider';
 
 const Layout: React.FC = () => {
-  const { provider } = useProviderStore();
+  const { providerType } = useWeb3Store();
 
   return (
     <>
@@ -16,7 +17,7 @@ const Layout: React.FC = () => {
       </main>
       <footer className="max-w-screen-xl w-full p-2 xl:mx-auto xl:py-4 flex justify-between">
         <p className="text-xs">
-          provider: <span className="font-semibold">{provider}</span>
+          provider: <span className="font-semibold">{providerType}</span>
         </p>
         <a
           className="text-xs underline cursor-pointer"
