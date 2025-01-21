@@ -4,6 +4,7 @@ enum ProviderTypeEnum {
 }
 
 enum CollateralTypeEnum {
+  All = 'All',
   ETH_A = 'ETH-A',
   WBTC_A = 'WBTC-A',
   USDC_A = 'USDC-A',

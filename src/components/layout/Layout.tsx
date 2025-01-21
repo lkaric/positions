@@ -12,7 +12,7 @@ const Layout: React.FC = () => {
         <img src="/logo.svg" alt="Positions" />
         <ProviderSelect />
       </header>
-      <main className="max-w-screen-xl w-full h-full p-2 xl:mx-auto">
+      <main className="max-w-screen-xl w-full h-full p-2 xl:mx-auto flex flex-col overflow-auto">
         <Outlet />
       </main>
       <footer className="max-w-screen-xl w-full p-2 xl:mx-auto xl:py-4 flex justify-between">
