@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { useWeb3Store } from '@/lib/web3';
+import { CollateralTypeEnum, useWeb3Store } from '@/lib/web3';
 
 import { useGetCollateralTypeRate, useSearchNearbyCdp } from '../../api';
 
@@ -16,8 +16,8 @@ const CdpList: React.FC = () => {
   const { data, searchId, isLoading, error, searchNearbyCdp, nearbyIds } =
     useSearchNearbyCdp();
 
-  const handleSearch = (id: number) => {
-    searchNearbyCdp(id);
+  const handleSearch = (id: number, collateralType?: CollateralTypeEnum) => {
+    searchNearbyCdp(id, collateralType);
   };
 
   useEffect(() => {
