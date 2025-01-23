@@ -38,6 +38,17 @@ const CdpList: React.FC = () => {
         <CdpSearch onSearch={handleSearch} />
       </div>
 
+      <div className="w-full h-1 mb-4 bg-gray-200 rounded">
+        {isLoading && (
+          <div
+            className="h-full bg-blue-500 rounded transition-all duration-500"
+            style={{
+              width: `${(data.size / nearbyIds.length) * 100}%`,
+            }}
+          />
+        )}
+      </div>
+
       <div className="flex flex-col gap-2 overflow-auto">
         {searchId && data.has(searchId) && (
           <CdpCard
