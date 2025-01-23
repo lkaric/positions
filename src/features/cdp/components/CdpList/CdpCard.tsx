@@ -31,7 +31,6 @@ export const CdpCard: React.FC<CdpCardProps> = ({
 
   const formattedCollateral = useMemo(() => {
     const value = formatWeiValue(collateral);
-    console.log({ value: Number(value) });
 
     return `${formatNumber(Number(value), 3)} ETH`;
   }, [collateral]);
