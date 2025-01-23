@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 
 import { CollateralTypeEnum, useWeb3Store } from '@/lib/web3';
 
-import { bytesToString, delay, formatWeiValue } from '@/utils';
+import { delay } from '@/utils';
 
 import { CDP_ABI } from '../constants';
 
@@ -24,6 +24,7 @@ interface UseSearchNearbyCdp {
   error: Error | null;
   nearbyIds: number[];
   searchNearbyCdp: (cdpId: number) => Promise<void>;
+  searchId: number | null;
 }
 
 const useSearchNearbyCdp = (
@@ -40,6 +41,7 @@ const useSearchNearbyCdp = (
   const { client } = useWeb3Store();
 
   const [data, setData] = useState<Map<number, CdpData>>(new Map());
+  const [searchId, setSearchId] = useState<number | null>(null);
   const [nearbyIds, setNearbyIds] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -84,10 +86,11 @@ const useSearchNearbyCdp = (
         const data = await contract.methods.getCdpInfo(id).call();
 
         const cdpData: CdpData = {
+          id,
           ...data,
-          ilk: bytesToString(data.ilk as string),
-          collateral: formatWeiValue(data.collateral),
-          debt: formatWeiValue(data.debt),
+          ilk: data.ilk,
+          collateral: data.collateral,
+          debt: data.debt,
         };
 
         console.log(`Successfully fetched CDP ${id}`);
@@ -184,7 +187,9 @@ const useSearchNearbyCdp = (
   const searchNearbyCdp = useCallback(
     async (id: number) => {
       const ids = generateNearbyIds(id);
+      setSearchId(id);
       setIsLoading(true);
+      setData(new Map());
       setNearbyIds(ids);
 
       let failedIds: number[] = [];
@@ -231,6 +236,7 @@ const useSearchNearbyCdp = (
 
   return {
     data,
+    searchId,
     isLoading,
     progress,
     error,

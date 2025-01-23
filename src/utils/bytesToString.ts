@@ -1,4 +1,10 @@
-const bytesToString = (hex: string): string => {
+import { MatchPrimitiveType } from 'web3';
+
+const bytesToString = (hex: MatchPrimitiveType<'bytes32', unknown>): string => {
+  if (typeof hex !== 'string') {
+    return 'Error decoding!';
+  }
+
   const cleanHex = hex.replace(/^0x/, '');
 
   const bytes = new Uint8Array(

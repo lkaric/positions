@@ -13,7 +13,7 @@ import { CollateralTypeEnum } from '@/lib/web3';
 import { useDebounce } from '@/utils';
 
 interface CdpSearchProps {
-  onSearch: (id: number, collateralType: CollateralTypeEnum) => void;
+  onSearch: (id: number, collateralType?: CollateralTypeEnum) => void;
 }
 
 const CdpSearch: React.FC<CdpSearchProps> = ({ onSearch }) => {

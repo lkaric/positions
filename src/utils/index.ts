@@ -4,3 +4,4 @@ export { bytesToString } from './bytesToString';
 export { isRateLimitError } from './isRateLimitError';
 export { delay } from './delay';
 export { formatWeiValue } from './formatWeiValue';
+export { formatNumber } from './formatNumber';
