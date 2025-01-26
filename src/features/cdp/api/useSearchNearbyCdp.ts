@@ -9,11 +9,11 @@ import { CDP_ABI } from '../constants';
 import { type CdpData } from '../types';
 
 interface UseSearchNearbyCdpOptions {
-  size?: number;
-  batchSize?: number;
-  batchDelay?: number;
-  maxRetries?: number;
-  retryDelay?: number;
+  size?: number; // Maximum number of CDPs to fetch
+  batchSize?: number; // Number of CDPs to fetch in parallel
+  batchDelay?: number; // Delay between batch requests (ms)
+  maxRetries?: number; // Maximum retry attempts for failed requests
+  retryDelay?: number; // Base delay between retries (ms)
 }
 
 interface UseSearchNearbyCdp {
@@ -33,7 +33,7 @@ const useSearchNearbyCdp = (
   options?: UseSearchNearbyCdpOptions,
 ): UseSearchNearbyCdp => {
   const {
-    size = 5,
+    size = 20,
     batchSize = 5,
     batchDelay = 3000,
     maxRetries = 3,
@@ -66,11 +66,11 @@ const useSearchNearbyCdp = (
       try {
         const contract = getContract();
         console.log(`Fetching CDP ${id}`);
+
         const data = await contract.methods.getCdpInfo(id).call();
 
         const cdpData: CdpData = {
           id,
-          ...data,
           ilk: data.ilk,
           collateral: data.collateral,
           debt: data.debt,
@@ -91,17 +91,15 @@ const useSearchNearbyCdp = (
 
   const generateNearbyIds = useCallback(
     (targetId: number, startOffset: number = 0): number[] => {
-      const ids = new Set<number>([targetId]);
-      let offset = startOffset;
+      const ids = new Set<number>();
+      const rangeStart = targetId - size + startOffset;
+      const rangeEnd = targetId + size + startOffset;
 
-      while (ids.size < size) {
-        const above = targetId + offset;
-        const below = targetId - offset;
-
-        if (above > 0) ids.add(above);
-        if (below > 0) ids.add(below);
-
-        offset++;
+      for (let i = rangeStart; i <= rangeEnd && ids.size < size; i++) {
+        // Skip the target ID if this isn't the first batch
+        if (i > 0 && (startOffset === 0 || i !== targetId)) {
+          ids.add(i);
+        }
       }
 
       const sortedIds = Array.from(ids)
@@ -109,7 +107,7 @@ const useSearchNearbyCdp = (
         .slice(0, size);
 
       console.log(
-        `Generated ${sortedIds.length} nearby IDs around ${targetId}, starting from offset ${startOffset}`,
+        `Generating IDs for batch (targetId=${targetId}, startOffset=${startOffset}):`,
         sortedIds,
       );
       return sortedIds;
@@ -122,6 +120,7 @@ const useSearchNearbyCdp = (
       ids: number[],
       collateralType?: CollateralTypeEnum,
     ): Promise<{ succeeded: CdpData[]; failed: number[] }> => {
+      // Process multiple CDP requests in parallel
       const results = await Promise.allSettled(ids.map((id) => getCdpById(id)));
       const succeeded: CdpData[] = [];
       const failed: number[] = [];
@@ -130,6 +129,7 @@ const useSearchNearbyCdp = (
         const id = ids[index];
         if (result.status === 'fulfilled') {
           const cdp = result.value;
+          // Include CDP if no collateral filter or it matches the filter
           if (
             !collateralType ||
             collateralType === CollateralTypeEnum.All ||
@@ -142,9 +142,6 @@ const useSearchNearbyCdp = (
         }
       });
 
-      console.log(
-        `Batch processed: ${succeeded.length} succeeded, ${failed.length} failed`,
-      );
       return { succeeded, failed };
     },
     [getCdpById],
@@ -160,13 +157,11 @@ const useSearchNearbyCdp = (
       const succeededCdps: CdpData[] = [];
 
       while (currentFailedIds.length > 0 && retryAttempt < maxRetries) {
-        console.log(
-          `Retry attempt ${retryAttempt + 1} for ${currentFailedIds.length} CDPs`,
-        );
-
+        // Reduce batch size for retries
         const retryBatchSize = Math.max(2, Math.floor(batchSize / 2));
         const nextFailedIds: number[] = [];
 
+        // Process failed IDs in smaller batches
         for (let i = 0; i < currentFailedIds.length; i += retryBatchSize) {
           const batchIds = currentFailedIds.slice(i, i + retryBatchSize);
           const { succeeded, failed } = await processBatch(
@@ -177,6 +172,7 @@ const useSearchNearbyCdp = (
           succeededCdps.push(...succeeded);
           nextFailedIds.push(...failed);
 
+          // Add delay between retry batches
           if (i + retryBatchSize < currentFailedIds.length) {
             await delay(batchDelay);
           }
@@ -185,14 +181,9 @@ const useSearchNearbyCdp = (
         currentFailedIds = nextFailedIds;
         retryAttempt++;
 
-        if (currentFailedIds.length === 0) {
-          console.log('All CDPs successfully fetched after retries');
-          break;
-        }
-
+        // Calculate exponential backoff delay for next retry attempt
         if (retryAttempt < maxRetries && currentFailedIds.length > 0) {
           const backoffDelay = retryDelay * Math.pow(2, retryAttempt);
-          console.log(`Waiting ${backoffDelay}ms before next retry attempt`);
           await delay(backoffDelay);
         }
       }
@@ -211,34 +202,33 @@ const useSearchNearbyCdp = (
       signal?: AbortSignal,
     ): Promise<Map<number, CdpData>> => {
       try {
-        if (signal?.aborted) {
-          throw new Error('Search aborted');
-        }
-
-        console.log(
-          `Searching batch with offset ${offset}, current CDPs: ${existingCdps.size}`,
-        );
+        // First abort check: Early exit before starting any work
+        // This prevents unnecessary ID generation and batch processing
+        // if the search was already cancelled
+        if (signal?.aborted) throw new Error('Search aborted');
 
         const newIds = generateNearbyIds(targetId, offset);
         setNearbyIds(newIds);
-
         const { succeeded, failed } = await processBatch(
           newIds,
           collateralType,
         );
 
-        if (signal?.aborted) {
-          throw new Error('Search aborted');
-        }
+        // Second abort check: After main batch processing
+        // This prevents starting the retry mechanism if search was cancelled
+        // during the potentially long-running processBatch operation
+        if (signal?.aborted) throw new Error('Search aborted');
 
         const retriedCdps =
           failed.length > 0
             ? await processFailedCdps(failed, collateralType)
             : [];
 
-        if (signal?.aborted) {
-          throw new Error('Search aborted');
-        }
+        // Third abort check: After retry operations
+        // This prevents updating state and starting the next recursive call
+        // if search was cancelled during the retry operations
+        // which can be time-consuming due to exponential backoff
+        if (signal?.aborted) throw new Error('Search aborted');
 
         const allCdps = [...succeeded, ...retriedCdps];
         const updatedCdps = new Map(existingCdps);
@@ -251,10 +241,7 @@ const useSearchNearbyCdp = (
         }
 
         await delay(batchDelay);
-
-        if (signal?.aborted) {
-          throw new Error('Search aborted');
-        }
+        if (signal?.aborted) throw new Error('Search aborted');
 
         return searchBatch(
           targetId,
@@ -276,13 +263,14 @@ const useSearchNearbyCdp = (
 
   const searchNearbyCdp = useCallback(
     async (id: number, collateralType?: CollateralTypeEnum) => {
-      // Abort previous search if exists
+      // Cancel any existing search
       if (searchAbortController.current) {
         searchAbortController.current.abort();
       }
 
-      // Create new abort controller for this search
+      // Setup new search
       searchAbortController.current = new AbortController();
+
       const { signal } = searchAbortController.current;
 
       setSearchId(id);
@@ -307,13 +295,11 @@ const useSearchNearbyCdp = (
 
           setData(new Map(sortedCdps));
           setProgress(100);
-          console.log('CDP search completed');
         }
       } catch (err) {
         if (!signal.aborted) {
           const errorMessage =
             err instanceof Error ? err.message : 'Failed to fetch CDPs';
-          console.error('CDP search failed:', errorMessage);
           setError(new Error(errorMessage));
         }
       } finally {
