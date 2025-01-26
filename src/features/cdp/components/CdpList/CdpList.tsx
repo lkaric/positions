@@ -13,8 +13,15 @@ const CdpList: React.FC = () => {
   const { isConnected } = useWeb3Store();
   const { data: collateralRates, getCollateralsTypeRate } =
     useGetCollateralTypeRate();
-  const { data, searchId, isLoading, error, searchNearbyCdp, nearbyIds } =
-    useSearchNearbyCdp();
+  const {
+    data,
+    searchId,
+    isLoading,
+    error,
+    searchNearbyCdp,
+    nearbyIds,
+    progress,
+  } = useSearchNearbyCdp();
 
   const handleSearch = (id: number, collateralType?: CollateralTypeEnum) => {
     searchNearbyCdp(id, collateralType);
@@ -45,7 +52,7 @@ const CdpList: React.FC = () => {
           <div
             className="h-full bg-blue-500 rounded transition-all duration-500"
             style={{
-              width: `${(data.size / nearbyIds.length) * 100}%`,
+              width: `${progress}%`,
             }}
           />
         )}

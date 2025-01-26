@@ -92,16 +92,27 @@ const useSearchNearbyCdp = (
   const generateNearbyIds = useCallback(
     (targetId: number, startOffset: number = 0): number[] => {
       const ids = new Set<number>();
-      const rangeStart = targetId - size + startOffset;
-      const rangeEnd = targetId + size + startOffset;
+      const halfSize = Math.floor(size / 2);
 
       if (startOffset === 0) {
         ids.add(targetId);
-      }
 
-      for (let i = rangeStart; i <= rangeEnd && ids.size < size; i++) {
-        if (i > 0 && i !== targetId) {
-          ids.add(i);
+        for (let i = 1; i <= halfSize; i++) {
+          const id = targetId - i;
+          if (id > 0) ids.add(id);
+        }
+
+        for (let i = 1; i <= halfSize; i++) {
+          ids.add(targetId + i);
+        }
+      } else {
+        const rangeStart = targetId - halfSize - startOffset;
+        const rangeEnd = targetId + halfSize + startOffset;
+
+        for (let i = rangeStart; i <= rangeEnd && ids.size < size; i++) {
+          if (i > 0 && i !== targetId) {
+            ids.add(i);
+          }
         }
       }
 
