@@ -157,6 +157,16 @@ const useSearchNearbyCdp = (
               bytesToString(cdp.ilk) === collateralType
             ) {
               succeeded.push(cdp);
+              setData((currentData) => {
+                const newData = new Map(currentData);
+                newData.set(cdp.id, cdp);
+                return newData;
+              });
+              const currentProgress = Math.min(
+                (succeeded.length / size) * 100,
+                100,
+              );
+              setProgress(currentProgress);
             }
           } else {
             failed.push(id);
@@ -171,7 +181,7 @@ const useSearchNearbyCdp = (
 
       return { succeeded, failed };
     },
-    [getCdpById, batchSize, batchDelay],
+    [getCdpById, batchSize, batchDelay, size],
   );
 
   const processFailedCdps = useCallback(
@@ -260,8 +270,6 @@ const useSearchNearbyCdp = (
         const allCdps = [...succeeded, ...retriedCdps];
         const updatedCdps = new Map(existingCdps);
         allCdps.forEach((cdp) => updatedCdps.set(cdp.id, cdp));
-
-        setProgress((Math.min(updatedCdps.size, size) / size) * 100);
 
         if (updatedCdps.size >= size) {
           return updatedCdps;
