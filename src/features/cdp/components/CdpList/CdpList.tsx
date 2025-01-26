@@ -21,8 +21,10 @@ const CdpList: React.FC = () => {
   };
 
   useEffect(() => {
-    getCollateralsTypeRate();
-  }, [getCollateralsTypeRate]);
+    if (isConnected) {
+      getCollateralsTypeRate();
+    }
+  }, [getCollateralsTypeRate, isConnected]);
 
   if (!isConnected) {
     return <div className="text-center">Please connect your wallet</div>;
