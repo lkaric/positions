@@ -95,9 +95,12 @@ const useSearchNearbyCdp = (
       const rangeStart = targetId - size + startOffset;
       const rangeEnd = targetId + size + startOffset;
 
+      if (startOffset === 0) {
+        ids.add(targetId);
+      }
+
       for (let i = rangeStart; i <= rangeEnd && ids.size < size; i++) {
-        // Skip the target ID if this isn't the first batch
-        if (i > 0 && (startOffset === 0 || i !== targetId)) {
+        if (i > 0 && i !== targetId) {
           ids.add(i);
         }
       }
@@ -120,31 +123,44 @@ const useSearchNearbyCdp = (
       ids: number[],
       collateralType?: CollateralTypeEnum,
     ): Promise<{ succeeded: CdpData[]; failed: number[] }> => {
-      // Process multiple CDP requests in parallel
-      const results = await Promise.allSettled(ids.map((id) => getCdpById(id)));
       const succeeded: CdpData[] = [];
       const failed: number[] = [];
 
-      results.forEach((result, index) => {
-        const id = ids[index];
-        if (result.status === 'fulfilled') {
-          const cdp = result.value;
-          // Include CDP if no collateral filter or it matches the filter
-          if (
-            !collateralType ||
-            collateralType === CollateralTypeEnum.All ||
-            bytesToString(cdp.ilk) === collateralType
-          ) {
-            succeeded.push(cdp);
+      // Process IDs in smaller batches according to batchSize
+      for (let i = 0; i < ids.length; i += batchSize) {
+        const batchIds = ids.slice(i, i + batchSize);
+
+        // Process current batch in parallel
+        const results = await Promise.allSettled(
+          batchIds.map((id) => getCdpById(id)),
+        );
+
+        // Process results for this batch
+        results.forEach((result, index) => {
+          const id = batchIds[index];
+          if (result.status === 'fulfilled') {
+            const cdp = result.value;
+            if (
+              !collateralType ||
+              collateralType === CollateralTypeEnum.All ||
+              bytesToString(cdp.ilk) === collateralType
+            ) {
+              succeeded.push(cdp);
+            }
+          } else {
+            failed.push(id);
           }
-        } else {
-          failed.push(id);
+        });
+
+        // Add delay between batches if not the last batch
+        if (i + batchSize < ids.length) {
+          await delay(batchDelay);
         }
-      });
+      }
 
       return { succeeded, failed };
     },
-    [getCdpById],
+    [getCdpById, batchSize, batchDelay],
   );
 
   const processFailedCdps = useCallback(
