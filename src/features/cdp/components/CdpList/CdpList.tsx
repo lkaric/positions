@@ -14,17 +14,17 @@ const CdpList: React.FC = () => {
   const { data: collateralRates, getCollateralsTypeRate } =
     useGetCollateralTypeRate();
   const {
-    data,
     searchId,
-    isLoading,
-    error,
-    searchNearbyCdp,
-    nearbyIds,
-    progress,
+    searchData,
+    isSearchLoading,
+    searchError,
+    size,
+    searchProgress,
+    searchNearbyCdps,
   } = useSearchNearbyCdp();
 
   const handleSearch = (id: number, collateralType?: CollateralTypeEnum) => {
-    searchNearbyCdp(id, collateralType);
+    searchNearbyCdps(id, collateralType);
   };
 
   useEffect(() => {
@@ -37,8 +37,8 @@ const CdpList: React.FC = () => {
     return <div className="text-center">Please connect your wallet</div>;
   }
 
-  if (error) {
-    return <div className="text-red-500">Error: {error.message}</div>;
+  if (searchError) {
+    return <div className="text-red-500">Error: {searchError.message}</div>;
   }
 
   return (
@@ -48,26 +48,26 @@ const CdpList: React.FC = () => {
       </div>
 
       <div className="w-full h-1 mb-4 bg-gray-200 rounded">
-        {isLoading && (
+        {isSearchLoading && (
           <div
             className="h-full bg-blue-500 rounded transition-all duration-500"
             style={{
-              width: `${progress}%`,
+              width: `${searchProgress}%`,
             }}
           />
         )}
       </div>
 
       <div className="flex flex-col gap-2 overflow-auto">
-        {searchId && data.has(searchId) && (
+        {searchId && searchData.has(searchId) && (
           <CdpCard
             key={searchId}
-            {...data.get(searchId)!}
-            rate={collateralRates.get(data.get(searchId)!.ilk)}
+            {...searchData.get(searchId)!}
+            rate={collateralRates.get(searchData.get(searchId)!.ilk)}
           />
         )}
 
-        {Array.from(data.entries()).map(
+        {Array.from(searchData.entries()).map(
           ([id, data]) =>
             id !== searchId && (
               <CdpCard
@@ -78,8 +78,8 @@ const CdpList: React.FC = () => {
             ),
         )}
 
-        {isLoading &&
-          Array.from({ length: nearbyIds.length }).map((_, i) => (
+        {isSearchLoading &&
+          Array.from({ length: size }).map((_, i) => (
             <CdpCardSkeleton key={`skeleton-${i}`} />
           ))}
       </div>
