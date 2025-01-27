@@ -139,6 +139,7 @@ const useSearchNearbyCdp = (
       ids: number[],
       collateralType?: CollateralTypeEnum,
     ): Promise<{ succeeded: CdpData[]; failed: number[] }> => {
+      console.group('Batch');
       const results = await Promise.allSettled(ids.map(fetchCdp));
 
       const succeeded: CdpData[] = [];
@@ -161,6 +162,12 @@ const useSearchNearbyCdp = (
         }
       });
 
+      console.log(`Batch finished: `, {
+        succeeded: succeeded.map((cdp) => cdp.id),
+        failed,
+      });
+
+      console.groupEnd();
       return { succeeded, failed };
     },
     [fetchCdp, filterCdp, size],
@@ -202,7 +209,13 @@ const useSearchNearbyCdp = (
       let retryAttempt = 0;
       const succeeded: CdpData[] = [];
 
+      console.log(`Retrying failed IDs: ${currentIds}`);
+
       while (currentIds.length > 0 && retryAttempt < maxRetries) {
+        console.log(`Retry attempt ${retryAttempt + 1}/${maxRetries}`, {
+          remainingIds: currentIds,
+        });
+
         const retryBatchSize = Math.max(2, Math.floor(batchSize / 2));
 
         const { succeeded, failed } = await processIds(
@@ -216,9 +229,17 @@ const useSearchNearbyCdp = (
         retryAttempt++;
 
         if (retryAttempt < maxRetries && currentIds.length > 0) {
-          await delay(retryDelay * Math.pow(2, retryAttempt));
+          const time = retryDelay * Math.pow(2, retryAttempt);
+
+          console.log(`Waiting for ${time}ms`);
+          await delay(time);
         }
       }
+
+      console.log(`Retry complete:`, {
+        succeeded: succeeded.map((cdp) => cdp.id),
+        remaining: currentIds,
+      });
 
       return succeeded;
     },
@@ -259,9 +280,11 @@ const useSearchNearbyCdp = (
       );
 
       if (updatedCdps.size >= size) {
+        console.log(`Search completed, reached target size.`);
         return updatedCdps;
       }
 
+      console.log(`Continuing search with next batch...`);
       await delay(batchDelay);
       if (signal?.aborted) throw new Error('[4] Search aborted!');
 
