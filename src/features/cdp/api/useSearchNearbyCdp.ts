@@ -50,6 +50,17 @@ const useSearchNearbyCdp = (
 
   const searchAbortController = useRef<AbortController | null>(null);
 
+  const getContract = useCallback(() => {
+    if (!client) {
+      throw new Error('Web3 client is not initialized!');
+    }
+
+    return new client.eth.Contract(
+      CDP_ABI,
+      import.meta.env.VITE_CONTRACT_ADDRESS,
+    );
+  }, [client]);
+
   const generateNearbyIds = useCallback(
     (targetId: number, startOffset: number = 0): number[] => {
       const ids = new Set<number>();
@@ -104,12 +115,7 @@ const useSearchNearbyCdp = (
   const fetchCdp = useCallback(
     async (id: number): Promise<CdpData> => {
       try {
-        if (!client) throw new Error('Web3 client not initialized');
-
-        const contract = new client.eth.Contract(
-          CDP_ABI,
-          import.meta.env.VITE_CONTRACT_ADDRESS,
-        );
+        const contract = getContract();
 
         console.log(`Fetching CDP ${id}`);
 
@@ -131,7 +137,7 @@ const useSearchNearbyCdp = (
         throw err;
       }
     },
-    [client],
+    [getContract],
   );
 
   const processBatch = useCallback(
