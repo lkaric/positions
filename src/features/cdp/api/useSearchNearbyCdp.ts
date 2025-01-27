@@ -148,15 +148,20 @@ const useSearchNearbyCdp = (
       results.forEach((result, index) => {
         const id = ids[index];
 
-        if (
-          result.status === 'fulfilled' &&
-          filterCdp(result.value, collateralType)
-        ) {
-          succeeded.push(result.value);
-          setSearchData(
-            (current) => new Map(current.set(result.value.id, result.value)),
-          );
-          setSearchProgress(Math.min((succeeded.length / size) * 100, 100));
+        if (result.status === 'fulfilled') {
+          if (filterCdp(result.value, collateralType)) {
+            succeeded.push(result.value);
+            // TODO: More elegant way to do this is to keep track of the size in a spearate counter, this way we're introducing the sideeffect to a dedicated state setter.
+            setSearchData((current) => {
+              const newData = new Map(
+                current.set(result.value.id, result.value),
+              );
+
+              setSearchProgress(Math.min((newData.size / size) * 100, 100));
+
+              return new Map(current.set(result.value.id, result.value));
+            });
+          }
         } else {
           failed.push(id);
         }
@@ -306,7 +311,11 @@ const useSearchNearbyCdp = (
 
   const searchNearbyCdps = useCallback(
     async (id: number, collateralType?: CollateralTypeEnum) => {
-      searchAbortController.current?.abort();
+      if (searchAbortController.current) {
+        searchAbortController.current.abort();
+        searchAbortController.current = null;
+        setIsSearchLoading(false);
+      }
 
       const abortController = new AbortController();
       searchAbortController.current = abortController;

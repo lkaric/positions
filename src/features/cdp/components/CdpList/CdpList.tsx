@@ -47,7 +47,7 @@ const CdpList: React.FC = () => {
         <CdpSearch onSearch={handleSearch} />
       </div>
 
-      <div className="w-full h-1 mb-4 bg-gray-200 rounded">
+      <div className="w-full h-full max-h-[0.5px] mb-4 bg-gray-200 rounded">
         {isSearchLoading && (
           <div
             className="h-full bg-blue-500 rounded transition-all duration-500"
@@ -58,6 +58,7 @@ const CdpList: React.FC = () => {
         )}
       </div>
 
+      {/* TODO: Add virtualization */}
       <div className="flex flex-col gap-2 overflow-auto">
         {searchId && searchData.has(searchId) && (
           <CdpCard
