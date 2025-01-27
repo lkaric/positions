@@ -212,19 +212,26 @@ const useSearchNearbyCdp = (
       console.log(`Retrying failed IDs: ${currentIds}`);
 
       while (currentIds.length > 0 && retryAttempt < maxRetries) {
-        console.log(`Retry attempt ${retryAttempt + 1}/${maxRetries}`, {
+        console.group(`Retry attempt ${retryAttempt + 1}/${maxRetries}`, {
           remainingIds: currentIds,
         });
 
         const retryBatchSize = Math.max(2, Math.floor(batchSize / 2));
+        const failedIds: number[] = [];
 
-        const { succeeded, failed } = await processIds(
-          currentIds.slice(0, retryBatchSize),
-          collateralType,
-        );
+        for (let i = 0; i < currentIds.length; i += retryBatchSize) {
+          const batchIds = currentIds.slice(i, i + retryBatchSize);
 
-        succeeded.push(...succeeded);
-        currentIds = failed;
+          const { succeeded: retrySucceeded, failed: retryFailed } =
+            await processIds(batchIds, collateralType);
+
+          succeeded.push(...retrySucceeded);
+          failedIds.push(...retryFailed);
+
+          if (i + retryBatchSize < currentIds.length) {
+            await delay(batchDelay);
+          }
+        }
 
         retryAttempt++;
 
@@ -234,6 +241,10 @@ const useSearchNearbyCdp = (
           console.log(`Waiting for ${time}ms`);
           await delay(time);
         }
+
+        currentIds = failedIds;
+
+        console.groupEnd();
       }
 
       console.log(`Retry complete:`, {
@@ -243,7 +254,7 @@ const useSearchNearbyCdp = (
 
       return succeeded;
     },
-    [processIds, batchSize, maxRetries, retryDelay],
+    [maxRetries, batchSize, processIds, batchDelay, retryDelay],
   );
 
   const search = useCallback(
