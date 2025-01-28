@@ -351,6 +351,7 @@ const useSearchNearbyCdp = (
             err instanceof Error ? err : new Error('Failed to fetch CDPs'),
           );
         }
+        console.log('Aborted');
       } finally {
         if (searchAbortController.current === abortController) {
           searchAbortController.current = null;
