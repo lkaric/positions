@@ -144,40 +144,48 @@ const useSearchNearbyCdp = (
     async (
       ids: number[],
       collateralType?: CollateralTypeEnum,
+      signal?: AbortSignal,
     ): Promise<{ succeeded: CdpData[]; failed: number[] }> => {
-      console.group('Batch');
-      const results = await Promise.allSettled(ids.map(fetchCdp));
+      if (signal?.aborted) throw new Error('Search aborted');
 
+      console.group('Batch');
+      const fetchPromise = Promise.allSettled(ids.map(fetchCdp));
+
+      // Note: This is an overkill to ensure that we can abort the batch process; Will work w/o this.
+      let abortHandler: () => void;
+      const abortPromise = new Promise<never>((_, reject) => {
+        abortHandler = () => reject(new Error('Search aborted'));
+        signal?.addEventListener('abort', abortHandler);
+      }).finally(() => {
+        signal?.removeEventListener('abort', abortHandler!);
+      });
+
+      const results = await Promise.race([fetchPromise, abortPromise]);
       const succeeded: CdpData[] = [];
       const failed: number[] = [];
 
       results.forEach((result, index) => {
         const id = ids[index];
+        if (signal?.aborted) throw new Error('Search aborted');
 
         if (result.status === 'fulfilled') {
-          if (filterCdp(result.value, collateralType)) {
-            succeeded.push(result.value);
-            // TODO: More elegant way to do this is to keep track of the size in a spearate counter, this way we're introducing the sideeffect to a dedicated state setter.
+          const cdp = result.value;
+
+          if (filterCdp(cdp, collateralType)) {
+            succeeded.push(cdp);
             setSearchData((current) => {
-              const newData = new Map(
-                current.set(result.value.id, result.value),
-              );
-
+              const newData = new Map(current.set(cdp.id, cdp));
               setSearchProgress(Math.min((newData.size / size) * 100, 100));
-
-              return new Map(current.set(result.value.id, result.value));
+              return newData;
             });
           }
         } else {
           failed.push(id);
+          console.log(`Failed to fetch CDP ${id}`);
         }
       });
 
-      console.log(`Batch finished: `, {
-        succeeded: succeeded.map((cdp) => cdp.id),
-        failed,
-      });
-
+      console.log('Batch results:', { succeeded, failed });
       console.groupEnd();
       return { succeeded, failed };
     },
@@ -188,20 +196,25 @@ const useSearchNearbyCdp = (
     async (
       ids: number[],
       collateralType?: CollateralTypeEnum,
+      signal?: AbortSignal,
     ): Promise<{ succeeded: CdpData[]; failed: number[] }> => {
+      if (signal?.aborted) throw new Error('Search aborted');
+
       const succeeded: CdpData[] = [];
       const failed: number[] = [];
 
       for (let i = 0; i < ids.length; i += batchSize) {
-        const batchIds = ids.slice(i, i + batchSize);
+        if (signal?.aborted) throw new Error('Search aborted');
 
+        const batchIds = ids.slice(i, i + batchSize);
         const { succeeded: batchSucceeded, failed: batchFailed } =
-          await processBatch(batchIds, collateralType);
+          await processBatch(batchIds, collateralType, signal);
 
         succeeded.push(...batchSucceeded);
         failed.push(...batchFailed);
 
         if (i + batchSize < ids.length) {
+          if (signal?.aborted) throw new Error('Search aborted');
           await delay(batchDelay);
         }
       }
@@ -215,8 +228,11 @@ const useSearchNearbyCdp = (
     async (
       ids: number[],
       collateralType?: CollateralTypeEnum,
+      signal?: AbortSignal,
     ): Promise<CdpData[]> => {
-      let currentIds = ids;
+      if (signal?.aborted) throw new Error('Search aborted');
+
+      let currentIds = [...ids];
       let retryAttempt = 0;
       const succeeded: CdpData[] = [];
 
@@ -226,6 +242,8 @@ const useSearchNearbyCdp = (
         console.group(`Retry attempt ${retryAttempt + 1}/${maxRetries}`, {
           remainingIds: currentIds,
         });
+
+        if (signal?.aborted) throw new Error('Search aborted');
 
         const retryBatchSize = Math.max(2, Math.floor(batchSize / 2));
         const failedIds: number[] = [];
@@ -247,6 +265,7 @@ const useSearchNearbyCdp = (
         retryAttempt++;
 
         if (retryAttempt < maxRetries && currentIds.length > 0) {
+          if (signal?.aborted) throw new Error('Search aborted');
           const time = retryDelay * Math.pow(2, retryAttempt);
 
           console.log(`Waiting for ${time}ms`);
@@ -284,13 +303,16 @@ const useSearchNearbyCdp = (
       const { succeeded, failed } = await processIds(
         generatedIds,
         collateralType,
+        signal,
       );
 
       // Second abort check: After main batch processing during the potentially long-running processBatch;
       if (signal?.aborted) throw new Error('[2] Search aborted!');
 
       const retriedCdps =
-        failed.length > 0 ? await processFailed(failed, collateralType) : [];
+        failed.length > 0
+          ? await processFailed(failed, collateralType, signal)
+          : [];
 
       // Third abort check: After retry operations blocks updating state and next recursion cycle if search was cancelled during retry, which can be time consuming due to the exponential backoff;
       if (signal?.aborted) throw new Error('[3] Search aborted!');
