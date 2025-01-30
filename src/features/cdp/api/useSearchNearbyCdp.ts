@@ -58,7 +58,7 @@ const useSearchNearbyCdp = (
 
         return idB - idA;
       })
-      .slice(0, size)
+      .slice(0, size + 1)
       .map(([, data]) => data);
   }, [data, searchId, size]);
 
