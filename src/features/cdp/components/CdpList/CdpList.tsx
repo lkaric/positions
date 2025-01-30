@@ -14,10 +14,10 @@ const CdpList: React.FC = () => {
   const { data: collateralRates, getCollateralsTypeRate } =
     useGetCollateralTypeRate();
   const {
+    searchIds,
     searchData,
     isSearchLoading,
     searchError,
-    size,
     searchProgress,
     searchNearbyCdps,
   } = useSearchNearbyCdp();
@@ -68,9 +68,12 @@ const CdpList: React.FC = () => {
         ))}
 
         {isSearchLoading &&
-          Array.from({ length: size }).map((_, i) => (
-            <CdpCardSkeleton key={`skeleton-${i}`} />
-          ))}
+          searchIds.map(
+            (id) =>
+              !searchData.find((data) => data.id === id) && (
+                <CdpCardSkeleton key={id} />
+              ),
+          )}
       </div>
     </>
   );
