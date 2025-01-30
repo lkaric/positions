@@ -40,8 +40,6 @@ const CdpList: React.FC = () => {
     return <div className="text-red-500">Error: {searchError.message}</div>;
   }
 
-  console.log({ ids: searchData.map((item) => item.id) });
-
   return (
     <>
       <div className="py-4">
