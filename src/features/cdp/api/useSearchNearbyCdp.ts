@@ -31,7 +31,7 @@ interface UseSearchNearbyCdp {
 const useSearchNearbyCdp = (
   options?: UseSearchNearbyCdpOptions,
 ): UseSearchNearbyCdp => {
-  const { size = 20, batchSize = 5, batchDelay = 500 } = options || {};
+  const { size = 20, batchSize = 5, batchDelay = 2500 } = options || {};
 
   const { client } = useWeb3Store();
 
