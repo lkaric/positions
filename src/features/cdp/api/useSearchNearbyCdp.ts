@@ -31,7 +31,7 @@ interface UseSearchNearbyCdp {
 const useSearchNearbyCdp = (
   options?: UseSearchNearbyCdpOptions,
 ): UseSearchNearbyCdp => {
-  const { size = 20, batchSize = 5, batchDelay = 3000 } = options || {};
+  const { size = 20, batchSize = 5, batchDelay = 500 } = options || {};
 
   const { client } = useWeb3Store();
 
@@ -67,21 +67,31 @@ const useSearchNearbyCdp = (
   }, [client]);
 
   const generateNearbyIds = useCallback(
-    (targetId: number): number[] => {
+    (
+      targetId: number,
+      offset: number = 0,
+      existing: number[] = [],
+    ): number[] => {
       const ids = new Set<number>();
-      const halfSize = Math.floor(size / 2);
+      const existingIds = new Set(existing);
 
-      for (let i = 0; i <= halfSize; i++) {
-        ids.add(targetId - i);
-        ids.add(targetId + i);
+      const range = Math.floor((size + offset) / 2);
+
+      for (let i = 0; i <= range; i++) {
+        const prev = targetId - i;
+        const next = targetId + i;
+
+        if (!existingIds.has(prev)) ids.add(prev);
+        if (!existingIds.has(next)) ids.add(next);
       }
 
       const sortedIds = Array.from(ids).sort((a, b) => b - a);
 
       console.log(
-        `Generating IDs for batch (targetId=${targetId}):`,
+        `Generating IDs for batch (targetId=${targetId}, offset=${offset}, range=${range}):`,
         sortedIds,
       );
+
       return sortedIds;
     },
     [size],
@@ -126,44 +136,94 @@ const useSearchNearbyCdp = (
     [getContract],
   );
 
+  const processBatch = useCallback(
+    async (
+      ids: number[],
+      collateralType?: CollateralTypeEnum,
+      signal?: AbortSignal,
+    ) => {
+      const success: number[] = [];
+      const failure: number[] = [];
+
+      for (let i = 0; i < ids.length; i += batchSize) {
+        let batchSuccess = 0;
+        let batchFailure = 0;
+
+        if (signal?.aborted) throw new Error('Search aborted');
+
+        const batchIds = ids.slice(i, i + batchSize);
+
+        console.group(`Fetching batch:`, batchIds);
+
+        const response = await Promise.all(batchIds.map(fetchCdp));
+
+        response.forEach((cdp) => {
+          if (filterCdp(cdp, collateralType)) {
+            success.push(cdp.id);
+            batchSuccess++;
+            setData((current) => {
+              const newData = new Map(current.set(cdp.id, cdp));
+              setSearchProgress(Math.min((newData.size / size) * 100, 100));
+              return newData;
+            });
+          } else {
+            failure.push(cdp.id);
+            batchFailure++;
+          }
+        });
+
+        if (i + batchSize < ids.length) {
+          await delay(batchDelay);
+        }
+
+        console.log(
+          `Batch finished (success=${batchSuccess}, failure=${batchFailure})`,
+        );
+
+        console.groupEnd();
+      }
+
+      return { success, failure };
+    },
+    [batchDelay, batchSize, fetchCdp, filterCdp, size],
+  );
+
   const search = useCallback(
     async (
       id: number,
       collateralType?: CollateralTypeEnum,
       signal?: AbortSignal,
     ) => {
-      const generatedIds = generateNearbyIds(id);
+      const generatedIds = generateNearbyIds(id, 0);
       setSearchIds(generatedIds);
 
       if (signal?.aborted) throw new Error('Search aborted');
 
-      for (let i = 0; i < generatedIds.length; i += batchSize) {
-        if (signal?.aborted) throw new Error('Search aborted');
+      const { success: initialBatchSuccess } = await processBatch(
+        generatedIds,
+        collateralType,
+        signal,
+      );
 
-        const batchIds = generatedIds.slice(i, i + batchSize);
+      let offset = batchSize + 1;
+      let existingIds = [...generatedIds];
+      let currentCount = initialBatchSuccess.length;
 
-        console.group(`Fetching batch:`, batchIds);
+      while (currentCount < size) {
+        const ids = generateNearbyIds(id, offset, existingIds);
 
-        const result = await Promise.all(batchIds.map(fetchCdp));
+        const { success } = await processBatch(ids, collateralType, signal);
 
-        result.forEach((cdp) => {
-          if (filterCdp(cdp, collateralType)) {
-            setData((current) => {
-              const newData = new Map(current.set(cdp.id, cdp));
-              setSearchProgress(Math.min((newData.size / size) * 100, 100));
-              return newData;
-            });
-          }
-        });
+        await delay(batchDelay);
 
-        if (i + batchSize < generatedIds.length) {
-          await delay(batchDelay);
-        }
-
-        console.groupEnd();
+        existingIds = [...existingIds, ...ids];
+        offset += batchSize;
+        currentCount += success.length;
       }
+
+      console.log('Finished search');
     },
-    [batchDelay, batchSize, fetchCdp, filterCdp, generateNearbyIds, size],
+    [batchDelay, batchSize, generateNearbyIds, processBatch, size],
   );
 
   const searchNearbyCdps = useCallback(
