@@ -74,35 +74,54 @@ const useSearchNearbyCdp = (
   }, [client]);
 
   const generateNearbyIds = useCallback(
-    (targetId: number, startOffset: number = 0): number[] => {
+    (
+      targetId: number,
+      startOffset: number = 0,
+      existing: Map<number, CdpData>,
+    ): number[] => {
       const ids = new Set<number>();
-      const halfSize = Math.floor(size / 2);
+      const halfSize = Math.floor((size - 1) / 2);
 
       if (startOffset === 0) {
         ids.add(targetId);
 
-        for (let i = 1; i <= halfSize; i++) {
-          const id = targetId - i;
-          if (id > 0) ids.add(id);
+        for (let i = 1; i <= halfSize + 1; i++) {
+          const id = targetId + i;
+          if (!existing.has(id)) ids.add(id);
         }
 
-        for (let i = 1; i <= halfSize; i++) {
-          ids.add(targetId + i);
+        for (let i = 0; i <= halfSize + 1; i++) {
+          const id = targetId - i;
+          if (id > 0 && !existing.has(id)) ids.add(id);
         }
       } else {
-        const rangeStart = targetId - halfSize - startOffset;
-        const rangeEnd = targetId + halfSize + startOffset;
+        const upperStart = targetId + halfSize + 1 + startOffset;
+        const lowerStart = targetId - halfSize - startOffset;
 
-        for (let i = rangeStart; i <= rangeEnd && ids.size < size; i++) {
-          if (i > 0 && i !== targetId) {
+        for (
+          let i = upperStart;
+          i < upperStart + batchSize && ids.size < batchSize;
+          i++
+        ) {
+          if (!existing.has(i)) {
+            ids.add(i);
+          }
+        }
+
+        for (
+          let i = lowerStart;
+          i > lowerStart - batchSize && ids.size < batchSize;
+          i--
+        ) {
+          if (i > 0 && !existing.has(i)) {
             ids.add(i);
           }
         }
       }
 
       const sortedIds = Array.from(ids)
-        .sort((a, b) => a - b)
-        .slice(0, size);
+        .sort((a, b) => b - a)
+        .slice(0, startOffset === 0 ? size + 1 : batchSize);
 
       console.log(
         `Generating IDs for batch (targetId=${targetId}, startOffset=${startOffset}):`,
@@ -110,7 +129,7 @@ const useSearchNearbyCdp = (
       );
       return sortedIds;
     },
-    [size],
+    [size, batchSize],
   );
 
   const filterCdp = useCallback(
@@ -307,10 +326,9 @@ const useSearchNearbyCdp = (
       collateralType?: CollateralTypeEnum,
       signal?: AbortSignal,
     ) => {
-      // First abort check: Early exit if the search was already cancelled;
       if (signal?.aborted) throw new Error('[1] Search aborted!');
 
-      const generatedIds = generateNearbyIds(id, offset);
+      const generatedIds = generateNearbyIds(id, offset, existing);
 
       const { succeeded, failed } = await processIds(
         generatedIds,
@@ -318,7 +336,6 @@ const useSearchNearbyCdp = (
         signal,
       );
 
-      // Second abort check: After main batch processing during the potentially long-running processBatch;
       if (signal?.aborted) throw new Error('[2] Search aborted!');
 
       const retriedCdps =
@@ -326,7 +343,6 @@ const useSearchNearbyCdp = (
           ? await processFailed(failed, collateralType, signal)
           : [];
 
-      // Third abort check: After retry operations blocks updating state and next recursion cycle if search was cancelled during retry, which can be time consuming due to the exponential backoff;
       if (signal?.aborted) throw new Error('[3] Search aborted!');
 
       const updatedCdps = new Map(existing);
@@ -344,9 +360,15 @@ const useSearchNearbyCdp = (
       await delay(batchDelay);
       if (signal?.aborted) throw new Error('[4] Search aborted!');
 
-      return search(id, offset + size, updatedCdps, collateralType, signal);
+      return search(
+        id,
+        offset + batchSize,
+        updatedCdps,
+        collateralType,
+        signal,
+      );
     },
-    [processIds, processFailed, generateNearbyIds, size, batchDelay],
+    [processIds, processFailed, generateNearbyIds, size, batchDelay, batchSize],
   );
 
   const searchNearbyCdps = useCallback(
