@@ -14,7 +14,6 @@ const CdpList: React.FC = () => {
   const { data: collateralRates, getCollateralsTypeRate } =
     useGetCollateralTypeRate();
   const {
-    searchId,
     searchData,
     isSearchLoading,
     searchError,
@@ -41,6 +40,8 @@ const CdpList: React.FC = () => {
     return <div className="text-red-500">Error: {searchError.message}</div>;
   }
 
+  console.log({ ids: searchData.map((item) => item.id) });
+
   return (
     <>
       <div className="py-4">
@@ -60,24 +61,13 @@ const CdpList: React.FC = () => {
 
       {/* TODO: Add virtualization */}
       <div className="flex flex-col gap-2 overflow-auto">
-        {searchId && searchData.has(searchId) && (
+        {searchData.map((data) => (
           <CdpCard
-            key={searchId}
-            {...searchData.get(searchId)!}
-            rate={collateralRates.get(searchData.get(searchId)!.ilk)}
+            key={data.id}
+            {...data}
+            rate={collateralRates.get(data.ilk)}
           />
-        )}
-
-        {Array.from(searchData.entries()).map(
-          ([id, data]) =>
-            id !== searchId && (
-              <CdpCard
-                key={id}
-                {...data}
-                rate={collateralRates.get(data.ilk)}
-              />
-            ),
-        )}
+        ))}
 
         {isSearchLoading &&
           Array.from({ length: size }).map((_, i) => (

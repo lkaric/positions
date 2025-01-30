@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useMemo } from 'react';
 
 import { CollateralTypeEnum, useWeb3Store } from '@/lib/web3';
 
@@ -18,7 +18,7 @@ interface UseSearchNearbyCdpOptions {
 
 interface UseSearchNearbyCdp {
   searchId: number | null;
-  searchData: Map<number, CdpData>;
+  searchData: CdpData[];
   isSearchLoading: boolean;
   searchProgress: number;
   searchError: Error | null;
@@ -42,13 +42,25 @@ const useSearchNearbyCdp = (
 
   const { client } = useWeb3Store();
 
-  const [searchData, setSearchData] = useState<Map<number, CdpData>>(new Map());
+  const [data, setData] = useState<Map<number, CdpData>>(new Map());
   const [searchId, setSearchId] = useState<number | null>(null);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [searchProgress, setSearchProgress] = useState(0);
   const [searchError, setSearchError] = useState<Error | null>(null);
 
   const searchAbortController = useRef<AbortController | null>(null);
+
+  const searchData = useMemo(() => {
+    return Array.from(data.entries())
+      .sort(([idA], [idB]) => {
+        if (idA === searchId) return -1;
+        if (idB === searchId) return 1;
+
+        return idB - idA;
+      })
+      .slice(0, size)
+      .map(([, data]) => data);
+  }, [data, searchId, size]);
 
   const getContract = useCallback(() => {
     if (!client) {
@@ -173,7 +185,7 @@ const useSearchNearbyCdp = (
 
           if (filterCdp(cdp, collateralType)) {
             succeeded.push(cdp);
-            setSearchData((current) => {
+            setData((current) => {
               const newData = new Map(current.set(cdp.id, cdp));
               setSearchProgress(Math.min((newData.size / size) * 100, 100));
               return newData;
@@ -351,7 +363,7 @@ const useSearchNearbyCdp = (
       try {
         setSearchId(id);
         setIsSearchLoading(true);
-        setSearchData(new Map());
+        setData(new Map());
         setSearchProgress(0);
         setSearchError(null);
 
@@ -364,7 +376,7 @@ const useSearchNearbyCdp = (
         );
 
         if (!abortController.signal.aborted) {
-          setSearchData(new Map(results));
+          setData(new Map(results));
           setSearchProgress(100);
         }
       } catch (err) {
